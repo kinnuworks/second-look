@@ -30,16 +30,17 @@ function appUrl(path: string) {
 function guardrail(mode: "monitor" | "block") {
   const g: Record<string, unknown> = { profile: "prompt-injection", mode, on_unavailable: "monitor" };
   if (process.env.GUARD_URL || process.env.PUBLIC_BASE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    g.url = process.env.GUARD_URL ?? appUrl("/api/guard/validate");
+    // Otari appends /validate to this base URL.
+    g.url = process.env.GUARD_URL ?? appUrl("/api/guard");
     if (process.env.GUARD_TOKEN) g.credential = process.env.GUARD_TOKEN;
   }
   return [g];
 }
 
-function mcpServer() {
-  const s: Record<string, unknown> = { name: "evidence", url: process.env.MCP_URL ?? appUrl("/api/mcp") };
-  if (process.env.MCP_TOKEN) s.authorization_token = process.env.MCP_TOKEN;
-  return s;
+// The evidence MCP server is stored in the Otari workspace (Tools > MCP servers);
+// requests name it by id. Its tools only read public data.
+function mcpServerIds(): string[] {
+  return (process.env.OTARI_MCP_SERVER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
 const URL_RE = /\b((?:https?:\/\/|www\.)[^\s<>"')]+|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|info|top|xyz|uk|co|io|app|online|site|live|shop|click|link|vip|cc|ru|cn|in|me|us|support|help|services)(?:\/[^\s<>"')]*)?)/gi;
@@ -141,8 +142,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
         visitor,
         maxTokens: 1500,
         tools: [{ type: "otari_web_search" }],
-        mcpServers: [mcpServer()],
-        extra: { max_tool_iterations: 6 },
+        extra: { max_tool_iterations: 6, ...(mcpServerIds().length ? { mcp_server_ids: mcpServerIds() } : {}) },
         messages: [
           {
             role: "system",
@@ -167,13 +167,17 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
       };
       // Collect what the MCP tools actually returned, from Otari's tool-call report.
       for (const c of r.toolCalls) {
-        const tool = c?.tool ?? c?.name ?? c?.function?.name ?? "";
-        const args = c?.arguments ?? c?.input ?? c?.args ?? {};
-        let out: any = c?.output ?? c?.result ?? c?.content ?? null;
+        if (c?.type !== "mcp") continue;
+        const tool = String(c?.name ?? c?.tool ?? "");
+        let out: any = c?.output ?? c?.result ?? null;
         if (typeof out === "string") out = parseJson(out) ?? out;
-        if (Array.isArray(out) && out[0]?.text) out = parseJson(out[0].text) ?? out;
-        const target = String(args?.link ?? args?.url ?? args?.domain ?? "");
-        const le = links.find((l) => target && (l.url === target || hostOf(l.url) === hostOf(target)));
+        if (!out || typeof out !== "object") continue;
+        const target = String(out.link_host ?? out.checked ?? out.domain ?? "");
+        const th = hostOf(target);
+        const le = links.find((l) => {
+          const lh = hostOf(l.url);
+          return !!th && !!lh && (lh === th || registrableDomain(lh) === registrableDomain(th));
+        });
         if (!le) continue;
         if (/compare_domains/.test(tool)) le.compare = out;
         if (/domain_age/.test(tool)) le.age = out;
@@ -186,7 +190,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
         id: "research",
         status: "done",
         label: official.domain ? `${org}'s real website is ${official.domain}` : org ? `Couldn't confirm ${org}'s website` : "Checked the links",
-        data: { official, links, tool_calls: r.toolCalls.map((c: any) => ({ type: c?.type, tool: c?.tool ?? c?.name, server: c?.server, query: c?.query, status: c?.status })) },
+        data: { official, links, tool_calls: r.toolCalls.map((c: any) => ({ type: c?.type, name: c?.name, server: c?.server, query: c?.query, status: c?.status, sources: (c?.sources ?? []).slice(0, 3).map((x: any) => x?.url) })) },
         proof: r.proof,
       });
     } catch (e) {

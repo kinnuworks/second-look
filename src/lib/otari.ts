@@ -87,7 +87,10 @@ async function post(
     fallback: h.get("otari-fallback"),
     guardrails: parseJsonHeader(h.get("otari-guardrails")),
     endUserBudget: h.get("otari-end-user-budget"),
-    costUsd: json?.usage?.cost_usd ?? json?.cost_usd ?? null,
+    costUsd: (() => {
+      const c = json?.usage?.cost_usd ?? json?.cost_usd ?? null;
+      return c == null ? null : Number(c);
+    })(),
     ms,
     status: res.status,
   };
@@ -133,7 +136,7 @@ export async function chat(o: ChatOpts) {
   const { json, proof } = await post(o.step, "/chat/completions", body, o.visitor);
   const content: string = json?.choices?.[0]?.message?.content ?? "";
   const toolCalls: any[] = json?.otari_tool_calls ?? [];
-  proof.tools = toolCalls.map((c) => c?.type ?? c?.tool ?? c?.name ?? "tool");
+  proof.tools = toolCalls.map((c) => (c?.type === "mcp" ? `mcp:${c?.name}` : (c?.type ?? "tool")));
   return { content, toolCalls, proof, raw: json };
 }
 
