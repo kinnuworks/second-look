@@ -11,6 +11,8 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // Responses from Otari and public data APIs are loosely shaped JSON.
+  { rules: { "@typescript-eslint/no-explicit-any": "off" } },
   {
     ignores: [
       "node_modules/**",
