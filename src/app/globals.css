@@ -38,6 +38,28 @@
 .tool__actions .btn { flex: none; }
 .allowance { font-size: 13px; color: var(--ink-3); }
 .allowance b { font-family: var(--font-mono); font-weight: 500; color: var(--ink-2); }
+
+/* ---- Allowance: the visitor's Otari end-user budget ---- */
+.wallet { padding: 14px 14px 12px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); display: flex; flex-direction: column; gap: 8px; }
+.wallet__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wallet__src { font: 500 11.5px/1 var(--font-mono); color: var(--ink-4); }
+.wallet__amount { display: flex; align-items: baseline; gap: 6px; font-size: 13.5px; color: var(--ink-3); }
+.wallet__amount b { font: 600 24px/1 var(--font-mono); letter-spacing: -.02em; color: var(--ink); }
+.wallet__bar { height: 8px; border-radius: 99px; background: var(--tint); overflow: hidden; }
+.wallet__bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); transition: width .9s var(--ease-out); }
+.wallet__bar i.is-low { background: var(--careful); }
+.wallet__bar i.is-empty { background: var(--scam); }
+.wallet__note { line-height: 1.45; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--r-md); background: var(--tint); }
+.seg button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--dur-hover), box-shadow var(--dur-hover); }
+.seg button b { font-size: 13px; font-weight: 650; }
+.seg button span { font-size: 11.5px; color: var(--ink-3); line-height: 1.35; }
+.seg button.on { background: var(--surface); box-shadow: var(--shadow-1), inset 0 0 0 1.5px var(--accent); color: var(--ink); }
+.seg button:disabled { cursor: not-allowed; opacity: .5; }
+.seg button.on:disabled { opacity: 1; }
+.receipt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; color: var(--ink-2); }
+.receipt b { font-family: var(--font-mono); font-weight: 600; color: var(--ink); }
+.receipt__mode { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--r-pill); background: var(--accent-wash); color: var(--accent-ink); font-size: 12px; font-weight: 650; }
 .examples .chips { gap: 6px; }
 .examples .chip { height: 32px; font-size: 13px; }
 .chip .k { width: 7px; height: 7px; border-radius: 50%; flex: none; }

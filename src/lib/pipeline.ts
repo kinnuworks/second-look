@@ -2,6 +2,7 @@ import { chat, codeExecute, directFetch, OtariError, parseJson, type Proof } fro
 import { maskMessage } from "./mask";
 import { compareDomains, hostOf, registrableDomain } from "./domains";
 import { scoreLocally, scoreScript } from "./score";
+import { readAllowance, depthFor, type CheckDepth } from "./allowance";
 
 export const MODELS = {
   // A routing policy name (primary + fallback provider) or a plain model id.
@@ -81,12 +82,29 @@ function isBudgetError(code: string) {
   return /budget_exceeded|end_user_limit_reached|user_blocked|end_user_budget/i.test(code);
 }
 
-export async function runCheck(input: string, visitorIn: string, emit: Emit, opts: { drill?: boolean; budgetDrill?: boolean } = {}) {
+export async function runCheck(input: string, visitorIn: string, emit: Emit, opts: { drill?: boolean; budgetDrill?: boolean; depth?: CheckDepth } = {}) {
   // Budget drill: the same check as a separate end user whose budget is too small
   // for any request, so Otari refuses it before a model runs.
   const visitor = opts.budgetDrill ? `drill_${visitorIn}` : visitorIn;
   const proofs: Proof[] = [];
   const keep = (p?: Proof | null) => p && proofs.push(p);
+
+  // The visitor's Otari budget decides how deep this check goes. With enough left
+  // for a full check we run web search; below that, a quick check skips it.
+  const before = await readAllowance(visitor);
+  // The visitor can also pick a quick check to make the allowance last.
+  const depth: CheckDepth = opts.budgetDrill ? "full" : opts.depth === "quick" ? "quick" : depthFor(before);
+  emit({ type: "allowance", phase: "before", allowance: before, depth, drill: !!opts.budgetDrill });
+  const finish = async (ok: boolean) => {
+    // Prefer what Otari actually took from the budget (it includes tool fees that
+    // don't appear in usage.cost_usd); fall back to the sum of reported costs.
+    const reported = proofs.reduce((n, p) => n + (typeof p.costUsd === "number" ? p.costUsd : 0), 0);
+    const after = await readAllowance(visitor);
+    const delta = before && after && after.source === "otari" ? after.spentUsd - before.spentUsd : null;
+    const cost = delta != null && delta >= 0 ? delta : reported;
+    emit({ type: "allowance", phase: "after", allowance: after, costUsd: cost, depth, drill: !!opts.budgetDrill });
+    emit({ type: "end", ok, proofs, costUsd: cost, depth });
+  };
 
   // 1. Mask personal details locally.
   const { masked, count } = maskMessage(input.slice(0, 4000));
@@ -128,7 +146,7 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
     keep(d.proof);
     emit({ type: "step", id: "extract", status: "error", label: isBudgetError(d.code) ? "Otari refused: this visitor's budget is used up" : "Couldn't read the message", detail: d.message, proof: d.proof });
     if (isBudgetError(d.code)) emit({ type: "budget", code: d.code, detail: d.message, drill: !!opts.budgetDrill });
-    emit({ type: "end", ok: false, proofs });
+    await finish(false);
     return;
   }
 
@@ -145,22 +163,23 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
   let budgetHit = false;
   const doResearch = async () => {
   if (org || links.length) {
-      emit({ type: "step", id: "research", status: "running", label: org ? `Looking up ${org}'s real website and checking the links` : "Checking the links" });
+      const search = depth === "full" && !!org;
+      emit({ type: "step", id: "research", status: "running", label: search ? `Looking up ${org}'s real website and checking the links` : "Checking the links" });
       try {
         const r = await chat({
           step: "research",
           model: MODELS.research,
           visitor,
           maxTokens: 1500,
-          tools: [{ type: "otari_web_search", max_uses: 2 }],
+          tools: search ? [{ type: "otari_web_search", max_uses: 2 }] : undefined,
           extra: { max_tool_iterations: 4, ...(mcpServerIds().length ? { mcp_server_ids: mcpServerIds() } : {}) },
           messages: [
             {
               role: "system",
               content:
                 "You check the evidence behind a suspicious message. Use the tools. Steps: " +
-                (org ? `(1) Use web search to find ${org}'s official website domain and, if one exists, its official page about scam or phishing messages. ` : "") +
-                "(2) For each link: call compare_domains with the official domain (if you found one), domain_age, and phishing_list. " +
+                (search ? `(1) Use web search to find ${org}'s official website domain and, if one exists, its official page about scam or phishing messages. ` : "") +
+                (search ? "(2) For each link: call compare_domains with the official domain (if you found one), domain_age, and phishing_list. " : "For each link: call domain_age and phishing_list. Do not guess an official domain; leave official_domain null. ") +
                 'Then reply with JSON only: {"official_domain": string|null, "official_source": string|null (URL where you confirmed it), ' +
                 '"scam_warning_url": string|null, "scam_warning_summary": string|null (one sentence: what the company says it never does, e.g. never asks for card details by text)}. ' +
                 "Only report what the tools returned.",
@@ -200,7 +219,7 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
           type: "step",
           id: "research",
           status: "done",
-          label: official.domain ? `${org}'s real website is ${official.domain}` : org ? `Couldn't confirm ${org}'s website` : "Checked the links",
+          label: official.domain ? `${org}'s real website is ${official.domain}` : !search && org ? `Checked the links (quick check: skipped the web search for ${org}'s real site)` : org ? `Couldn't confirm ${org}'s website` : "Checked the links",
           data: { official, links, tool_calls: r.toolCalls.map((c: any) => ({ type: c?.type, name: c?.name, server: c?.server, query: c?.query, status: c?.status, sources: (c?.sources ?? []).slice(0, 3).map((x: any) => x?.url) })) },
           proof: r.proof,
         });
@@ -276,7 +295,7 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
   await Promise.all([doResearch(), doPage()]);
   if (budgetHit) {
     emit({ type: "budget", code: "budget_exceeded" });
-    emit({ type: "end", ok: false, proofs });
+    await finish(false);
     return;
   }
 
@@ -348,5 +367,5 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
     emit({ type: "step", id: "verdict", status: "error", label: "Couldn't write the answer", detail: d.message, proof: d.proof });
     emit({ type: "verdict", band: scored.band, score: scored.score, fired: scored.fired, scoredWhere: scored.where, headline: null, why: scored.fired.map((f) => f.label), what_to_do: [], official, links, page, facts: ex });
   }
-  emit({ type: "end", ok: true, proofs });
+  await finish(true);
 }

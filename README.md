@@ -13,8 +13,9 @@ It runs on open-weight models through [Otari](https://otari.ai), Mozilla.ai's op
 2. Tap **Parcel redelivery fee**. In about half a minute you get a verdict, the reasons, and what to do.
 3. Tap **Test: page with hidden AI instructions**. Otari's guardrail blocks the linked page before any model reads it, and the step shows the safety model's reason.
 4. Turn on **Fallback drill** and run any example: the reading step starts on a model that refuses JSON mode, and Otari falls back on attempt 2.
-5. Turn on **Budget drill**: the check runs as a visitor whose budget is too small for any request, and Otari's refusal is shown word for word.
-6. Scroll to **Shows its work** for every Otari request behind the answer: model, provider, fallback, guardrail verdict, tools run, cost and request id.
+5. Watch **Your allowance today** at the top of the tool. It is your Otari end-user budget (15 cents a day), read back from Otari. After each check the receipt shows what Otari charged and the meter drops. Pick **Quick check** to skip web search and spend about a third as much; when the allowance runs low the tool switches to quick checks by itself.
+6. Turn on **Budget drill**: the check runs as a visitor whose budget is too small for any request, and Otari's refusal is shown word for word.
+7. Scroll to **Shows its work** for every Otari request behind the answer: model, provider, fallback, guardrail verdict, tools run, cost and request id.
 
 ---
 
@@ -31,7 +32,7 @@ It runs on open-weight models through [Otari](https://otari.ai), Mozilla.ai's op
 | Budgets and spending limits | An organisation spend ceiling caps the whole demo per month | Otari dashboard (Spend & budgets) |
 | Multiple models serving distinct roles | Four roles, each a different model | [`src/lib/pipeline.ts#L7`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/pipeline.ts#L7-L12) |
 | Guardrails | Request-level `guardrails`: monitor mode on the pasted text, block mode on the fetched page; our `/validate` service asks gpt-oss-safeguard-120b | [`src/lib/pipeline.ts#L105`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/pipeline.ts#L105) · [`src/lib/pipeline.ts#L248`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/pipeline.ts#L248) · [`src/lib/guard.ts`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/guard.ts) |
-| Per-user budgets | Each visitor is an Otari end user on a service key with a daily budget (`user` + `Otari-End-User-Budget`); the Budget drill shows a refusal | [`src/lib/otari.ts#L61`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/otari.ts#L61-L67) · [`src/lib/pipeline.ts#L87`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/pipeline.ts#L87) · [`src/app/api/budget/route.ts`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/app/api/budget/route.ts) |
+| Per-user budgets | Each visitor is an Otari end user on a service key with a daily budget (`user` + `Otari-End-User-Budget`). The budget sets how deep a check goes: a full check runs web search, and below about 3 cents left it drops to a quick check. The page shows the allowance and what each check took, read back from Otari. The Budget drill shows a refusal | [`src/lib/allowance.ts`](src/lib/allowance.ts) · [`src/lib/otari.ts#L61`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/otari.ts#L61-L67) · [`src/lib/pipeline.ts#L87`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/lib/pipeline.ts#L87) · [`src/app/api/budget/route.ts`](https://github.com/kinnuworks/second-look/blob/7ec8d8a07ac6cbe15cb5ca17a8f5b9d86633ee45/src/app/api/budget/route.ts) |
 
 ## What happens in one check
 
@@ -46,7 +47,7 @@ It runs on open-weight models through [Otari](https://otari.ai), Mozilla.ai's op
 | Answer | gpt-oss-120b writes a short verdict and what to do, using only the evidence. | second open model in a distinct role |
 | Budgets | Each visitor is an Otari end user on a service key with a daily budget; an organisation ceiling caps the whole demo per month. | per-user budgets · budgets and spending limits |
 
-Research and the link fetch run in parallel. A check takes about 35 seconds and costs about $0.02 to $0.03, most of it the web searches.
+Research and the link fetch run in parallel. A full check takes about 35 seconds. In our test runs a full check cost Otari about $0.031 and a quick check (no web search) about $0.010.
 
 ### The models
 

@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     async start(controller) {
       const emit = (e: unknown) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       try {
-        await runCheck(text, id, emit, { drill: !!body?.drill, budgetDrill: !!body?.budgetDrill });
+        await runCheck(text, id, emit, { drill: !!body?.drill, budgetDrill: !!body?.budgetDrill, depth: body?.depth === "quick" ? "quick" : "full" });
       } catch (e) {
         emit({ type: "fatal", message: (e as Error).message });
       } finally {

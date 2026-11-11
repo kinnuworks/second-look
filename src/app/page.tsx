@@ -200,6 +200,69 @@ function VerdictCard({ v, example, onCopy, copied }: { v: Verdict; example: bool
   );
 }
 
+type Allowance = { maxUsd: number; spentUsd: number; remainingUsd: number; fullChecksLeft: number; resetsAt: string | null; source: string };
+type Charge = { before: number | null; after: number | null; cost: number | null; depth: "full" | "quick"; drill: boolean };
+
+function usd(n: number) {
+  return `$${n.toFixed(3)}`;
+}
+function cents(n: number) {
+  return `${(n * 100).toFixed(1)}¢`;
+}
+
+function Wallet({ allow, costs, pick, lowFunds, onPick, busy }: { allow: Allowance | null; costs: { full: number; quick: number }; pick: "full" | "quick"; lowFunds: boolean; onPick: (d: "full" | "quick") => void; busy: boolean }) {
+  const pct = allow && allow.maxUsd > 0 ? Math.max(0, Math.min(100, (allow.remainingUsd / allow.maxUsd) * 100)) : 100;
+  const empty = !!allow && allow.remainingUsd < costs.quick;
+  return (
+    <div className="wallet">
+      <div className="wallet__top">
+        <span className="field-label">Your allowance today</span>
+        <span className="wallet__src">Otari end-user budget</span>
+      </div>
+      <div className="wallet__amount">
+        {allow ? (<><b>{usd(allow.remainingUsd)}</b><span> left of {usd(allow.maxUsd)}</span></>) : <span className="t-micro">Reading your budget from Otari…</span>}
+      </div>
+      <div className="wallet__bar" role="meter" aria-label="Allowance left" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><i style={{ width: `${pct}%` }} className={empty ? "is-empty" : lowFunds ? "is-low" : ""} /></div>
+      <div className="seg" role="radiogroup" aria-label="How deep to check">
+        <button type="button" role="radio" aria-checked={pick === "full"} className={pick === "full" ? "on" : ""} onClick={() => onPick("full")} disabled={busy || lowFunds}>
+          <b>Full check</b><span>web search + link checks · about {cents(costs.full)}</span>
+        </button>
+        <button type="button" role="radio" aria-checked={pick === "quick"} className={pick === "quick" ? "on" : ""} onClick={() => onPick("quick")} disabled={busy}>
+          <b>Quick check</b><span>link checks, no web search · about {cents(costs.quick)}</span>
+        </button>
+      </div>
+      <p className="t-micro wallet__note">
+        {empty
+          ? "Today's allowance is used up. Otari will refuse more checks until it resets at midnight UTC."
+          : lowFunds
+            ? "There isn't enough left for a full check, so the next one runs as a quick check. Resets at midnight UTC."
+            : allow
+              ? `Enough for about ${allow.fullChecksLeft} full ${allow.fullChecksLeft === 1 ? "check" : "checks"}. Otari charges every check to this budget. Resets at midnight UTC.`
+              : "Every visitor gets a small daily budget in Otari."}
+      </p>
+    </div>
+  );
+}
+
+function Receipt({ c }: { c: Charge }) {
+  if (c.drill) {
+    return <div className="receipt"><span className="receipt__mode">Budget drill</span><span>Charged to the drill visitor, not your allowance{c.cost != null ? ` · ${usd(c.cost)} spent` : ""}</span></div>;
+  }
+  return (
+    <div className="receipt">
+      <span className="receipt__mode">{c.depth === "quick" ? "Quick check" : "Full check"}</span>
+      {c.cost == null ? (
+        <span>{c.before != null ? `Charging your allowance (${usd(c.before)} before)…` : "Charging your allowance…"}</span>
+      ) : (
+        <span>
+          Otari charged <b>{usd(c.cost)}</b>
+          {c.before != null && c.after != null ? <> · allowance {usd(c.before)} → <b>{usd(c.after)}</b></> : null}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [text, setText] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -208,7 +271,10 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [budgetHit, setBudgetHit] = useState(false);
-  const [left, setLeft] = useState<number | null>(null);
+  const [allow, setAllow] = useState<Allowance | null>(null);
+  const [costs, setCosts] = useState<{ full: number; quick: number }>({ full: 0.032, quick: 0.011 });
+  const [depthPick, setDepthPick] = useState<"full" | "quick">("full");
+  const [charge, setCharge] = useState<Charge | null>(null);
   const [ran, setRan] = useState(false);
   const [drill, setDrill] = useState(false);
   const [budgetDrill, setBudgetDrill] = useState(false);
@@ -231,7 +297,8 @@ export default function Home() {
       const r = await fetch("/api/budget", { cache: "no-store" });
       if (r.ok) {
         const j = await r.json();
-        if (typeof j.checksLeft === "number") setLeft(j.checksLeft);
+        if (j.allowance) setAllow(j.allowance);
+        if (j.fullCheckUsd) setCosts({ full: j.fullCheckUsd, quick: j.quickCheckUsd });
       }
     } catch {}
   }
@@ -247,9 +314,11 @@ export default function Home() {
     setBudgetHit(false);
     setBudgetMsg(null);
     setCopied(false);
+    setCharge(null);
+    const pending: Charge = { before: null, after: null, cost: null, depth: "full", drill: budgetDrill };
     if (window.innerWidth < 900) toolRef.current?.querySelector(".tool__output")?.scrollIntoView({ behavior: "smooth", block: "start" });
     try {
-      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input, drill, budgetDrill }) });
+      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input, drill, budgetDrill, depth: lowFunds ? "quick" : depthPick }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `status ${res.status}`);
@@ -277,6 +346,11 @@ export default function Home() {
             });
           } else if (ev.type === "verdict") setVerdict(ev);
           else if (ev.type === "budget") { setBudgetHit(true); setBudgetMsg({ detail: ev.detail, drill: ev.drill }); }
+          else if (ev.type === "allowance") {
+            if (ev.phase === "before") { pending.before = ev.allowance?.remainingUsd ?? null; pending.depth = ev.depth; }
+            else { pending.after = ev.allowance?.remainingUsd ?? null; pending.cost = ev.costUsd ?? null; if (ev.allowance && !ev.drill) setAllow(ev.allowance); }
+            setCharge({ ...pending });
+          }
           else if (ev.type === "end") setProofs(ev.proofs ?? []);
           else if (ev.type === "fatal") setError(ev.message);
         }
@@ -285,7 +359,6 @@ export default function Home() {
       setError((e as Error).message);
     } finally {
       setBusy(false);
-      loadBudget();
     }
   }
 
@@ -311,6 +384,7 @@ export default function Home() {
   }
 
   const showExample = !ran;
+  const lowFunds = !!allow && allow.remainingUsd < costs.full;
   const shownVerdict = showExample ? EXAMPLE.verdict : verdict;
   const shownProofs = showExample ? EXAMPLE.proofs : proofs;
 
@@ -362,10 +436,11 @@ export default function Home() {
                 <div className="window__bar">
                   <span className="lights" aria-hidden="true"><i /><i /><i /></span>
                   <span className="window__title">Second Look</span>
-                  <span className="end t-micro">{left != null ? (left > 0 ? <span className="allowance"><b>{left}</b> free {left === 1 ? "check" : "checks"} left today</span> : <span className="allowance">Free checks used up for today</span>) : null}</span>
+                  <span className="end t-micro">{allow ? <span className="allowance"><b>{usd(allow.remainingUsd)}</b> left today</span> : null}</span>
                 </div>
                 <div className="tool__body">
                   <div className="tool__input">
+                    <Wallet allow={allow} costs={costs} pick={lowFunds ? "quick" : depthPick} lowFunds={lowFunds} onPick={setDepthPick} busy={busy} />
                     <label className="field-label" htmlFor="msg">The message you got</label>
                     <textarea
                       id="msg"
@@ -426,6 +501,7 @@ export default function Home() {
                         {budgetMsg?.detail && <div className="t-micro" style={{ marginTop: 6 }}>Otari said: &ldquo;{budgetMsg.detail}&rdquo;</div>}
                       </div>
                     )}
+                    {charge && <Receipt c={charge} />}
                     {shownVerdict && <VerdictCard v={shownVerdict} example={showExample} onCopy={showExample ? undefined : copyAnswer} copied={copied} />}
                     {!showExample && steps.length > 0 && (
                       <div>
@@ -438,7 +514,7 @@ export default function Home() {
                               </span>
                               <div>
                                 <div className="step__label">{s.label}</div>
-                                {STEP_FEATURE[s.id] && <div className="step__feat">{STEP_FEATURE[s.id]}</div>}
+                                {STEP_FEATURE[s.id] && <div className="step__feat">{s.id === "research" && /quick check/.test(s.label) ? STEP_FEATURE[s.id].replace(/ · Otari web search/, "") : STEP_FEATURE[s.id]}</div>}
                                 {s.detail && <div className="step__detail">{s.detail}</div>}
                                 {s.id === "research" && s.data?.links?.length > 0 && (
                                   <ul className="step__links">
@@ -507,7 +583,7 @@ export default function Home() {
               [I.page, "The page behind the link", "Opens the link on our server, never on your phone. If the page tries to give orders to AI checkers, Otari's guardrail stops it.", "otari_web_fetch · guardrail (block)"],
               [I.calc, "A red-flag score you can read", "Adds up the red flags with a fixed formula that runs in Otari's code sandbox. You can open the sum.", "otari_code_execution"],
               [I.chat, "A plain answer", "A second open model turns the evidence into a short verdict and what to do next.", "gpt-oss-120b · distinct role"],
-              [I.gauge, "Your own daily allowance", "Each visitor gets a small daily budget, so the free tool stays free for everyone.", "per-user budget · org cap · fallback routing"],
+              [I.gauge, "Your own daily allowance", "Each visitor has a 15-cent daily budget in Otari. The meter shows what each check took, and when it runs low the tool drops to a quick check instead of stopping.", "per-user budget · org cap · fallback routing"],
             ].map(([icon, t, p, f], i) => (
               <div key={i} className="tile reveal" style={{ ["--i" as any]: i % 3 }}>
                 <span className="icon-tile">{icon}</span>
@@ -568,7 +644,7 @@ export default function Home() {
               ["Why do some links not open?", "Scam pages are often taken down within hours of being reported. A dead link is reported as such; the domain's age and the lookalike check still count."],
               ["What should I do if it's a scam?", "Don't tap the link or reply. In the UK, forward scam texts to 7726. In the US, report them at reportfraud.ftc.gov. If you already paid or shared details, call your bank on the number on your card."],
               ["Which models do the work?", "Qwen3 235B reads and researches, Gemma 3 27B is the backup, gpt-oss-120b writes the answer and gpt-oss-safeguard-120b screens for planted instructions. The fallback drill starts on Qwen3Guard 8B, which refuses JSON mode. All are open-weight and run through Mozilla's Otari gateway."],
-              ["Why is there a daily limit?", "Each check costs about two cents in model and search fees. A small daily budget per visitor keeps it free for everyone."],
+              ["Why is there a daily limit?", "A full check costs about three cents in model, search and fetch fees, and a quick check about one cent. Each visitor gets 15 cents a day as an Otari end-user budget, so the tool stays free for everyone and nobody can run up the bill."],
             ].map(([q, a]) => (
               <details key={q}><summary>{q}</summary><p>{a}</p></details>
             ))}
