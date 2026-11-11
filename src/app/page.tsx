@@ -345,6 +345,19 @@ export default function Home() {
 
           <div className="hero__visual tool-stage" id="tool" ref={toolRef}>
             <div className="stage">
+              <div className="float float--sms" aria-hidden="true">
+                <div className="float__row"><span className="float__app">Messages</span><span className="float__time">now</span></div>
+                <b>Royal Mail</b>
+                <span>Your parcel is held. Pay £1.45 within 24 hours: royalmail-redelivery-uk.top</span>
+              </div>
+              <div className="float float--guard" aria-hidden="true">
+                <span className="pill-dot pill-dot--red" />
+                <span><b>Guardrail · block</b><br />Page refused: instructions aimed at AI checkers</span>
+              </div>
+              <div className="float float--fallback" aria-hidden="true">
+                <span className="pill-dot pill-dot--amber" />
+                <span><b>Otari fallback</b><br />Answered on attempt 2</span>
+              </div>
               <div className="window tool">
                 <div className="window__bar">
                   <span className="lights" aria-hidden="true"><i /><i /><i /></span>
@@ -453,6 +466,33 @@ export default function Home() {
         </div>
       </header>
 
+      <section className="section" id="why">
+        <div className="container">
+          <div className="section-head">
+            <span className="eyebrow"><span className="dot" />Why it exists</span>
+            <h2>&ldquo;Is this real?&rdquo; <span className="t-muted">Answered with evidence.</span></h2>
+          </div>
+          <div className="grid grid-2 compare">
+            <div className="card card--flat reveal">
+              <div className="verdict__label">The usual way</div>
+              <ul className="compare__list compare__list--old">
+                <li>Forward it to the one relative who &ldquo;knows about these things&rdquo;.</li>
+                <li>Search the phone number and land on spam forums.</li>
+                <li>Tap the link to see if it looks real, which is the one thing you shouldn&apos;t do.</li>
+              </ul>
+            </div>
+            <div className="card card--chosen reveal" style={{ ["--i" as any]: 1 }}>
+              <div className="verdict__label">With Second Look</div>
+              <ul className="compare__list">
+                <li>Paste it. We open the link on our server, never on your phone.</li>
+                <li>We find the company&apos;s real website and check whether the link imitates it.</li>
+                <li>You get a plain answer and what to do, with every check listed underneath.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="section section--alt" id="checks">
         <div className="container">
           <div className="section-head">
@@ -533,6 +573,18 @@ export default function Home() {
               <details key={q}><summary>{q}</summary><p>{a}</p></details>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="section final-cta">
+        <div className="container" style={{ textAlign: "center" }}>
+          <img src="/icon.png" alt="" className="final-cta__icon" width={88} height={88} />
+          <h2>Got a text you&apos;re not sure about? <span className="t-muted">Take a second look.</span></h2>
+          <div className="cta-row">
+            <a href="#tool" className="btn btn-candy btn-lg">Check a message</a>
+            <a href="https://github.com/kinnuworks/second-look" className="btn btn-outline btn-lg" target="_blank" rel="noreferrer">Read the code</a>
+          </div>
+          <div className="trust"><span>Free</span><span>No account</span><span>Open-weight models through Otari</span></div>
         </div>
       </section>
 
