@@ -2,7 +2,7 @@
 
 **Paste a text or email you're not sure about, and Second Look tells you in plain words whether it's a scam, with the evidence.**
 
-Every step runs on open-weight models through [Otari](https://otari.ai), because a scam check needs what plain open-model APIs don't give you: web search to find the company's real site, an MCP server for domain evidence, a server-side fetch of the link behind a guardrail, a code sandbox for the score, and a budget per visitor so the free tool stays free.
+It runs on open-weight models through [Otari](https://otari.ai), Mozilla.ai's open-source AI gateway, which gives those models the web search, link fetching, guardrails, code sandbox and per-visitor budgets that a scam check needs.
 
 ![Second Look checking a parcel-fee text](docs/second-look.gif)
 

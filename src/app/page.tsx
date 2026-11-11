@@ -149,12 +149,14 @@ function VerdictCard({ v, example }: { v: Verdict; example: boolean }) {
     <div className={`verdict verdict--${v.band}`}>
       <div className="verdict__top">
         <span className="verdict__band">{BAND_TEXT[v.band]}</span>
-        <span className="meter" title="Red-flag score">
+        <span className="meter" title="50 or more: likely scam. 25 to 49: be careful. Under 25: looks genuine.">
+          Red flags
           <span className="meter__bar"><i style={{ width: `${v.score}%` }} /></span>
           <b>{v.score}</b>/100
         </span>
       </div>
       <h3>{v.headline ?? BAND_TEXT[v.band]}</h3>
+      <p className="t-micro" style={{ marginTop: -6, marginBottom: 12 }}>Red-flag score: 50 or more means likely scam, 25 to 49 means be careful, under 25 looks genuine.</p>
       <div className="verdict__cols">
         {v.why.length > 0 && (
           <div>
@@ -314,7 +316,7 @@ export default function Home() {
                 <div className="window__bar">
                   <span className="lights" aria-hidden="true"><i /><i /><i /></span>
                   <span className="window__title">Second Look</span>
-                  <span className="end t-micro">{left != null ? <span className="allowance"><b>{left}</b> free checks left today</span> : null}</span>
+                  <span className="end t-micro">{left != null ? (left > 0 ? <span className="allowance"><b>{left}</b> free {left === 1 ? "check" : "checks"} left today</span> : <span className="allowance">Free checks used up for today</span>) : null}</span>
                 </div>
                 <div className="tool__body">
                   <div className="tool__input">
