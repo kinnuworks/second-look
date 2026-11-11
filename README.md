@@ -4,7 +4,7 @@
 
 It runs on open-weight models through [Otari](https://otari.ai), Mozilla.ai's open-source AI gateway, which gives those models the web search, link fetching, guardrails, code sandbox and per-visitor budgets that a scam check needs.
 
-![Second Look checking a parcel-fee text](docs/second-look.gif)
+![Second Look checking a live Amazon lookalike page from the OpenPhish feed; the receipt shows what Otari charged and the meter drops](docs/second-look.gif)
 
 **Live:** https://second-look-phi.vercel.app (no account needed)
 
