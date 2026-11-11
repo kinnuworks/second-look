@@ -6,7 +6,7 @@ import { scoreLocally, scoreScript } from "./score";
 export const MODELS = {
   // A routing policy name (primary + fallback provider) or a plain model id.
   extract: process.env.EXTRACT_MODEL ?? "alibaba/qwen3-235b-a22b-instruct-2507",
-  research: process.env.RESEARCH_MODEL ?? "z-ai/glm-5.2",
+  research: process.env.RESEARCH_MODEL ?? "alibaba/qwen3-235b-a22b-instruct-2507",
   verdict: process.env.VERDICT_MODEL ?? "openai/gpt-oss-120b",
   guard: process.env.GUARD_MODEL ?? "alibaba/qwen3guard-gen-8b",
 };
