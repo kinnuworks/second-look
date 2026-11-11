@@ -130,3 +130,8 @@
   .tool .window__title { display: none; }
   .tool__input, .tool__output { padding: 16px; }
 }
+
+.drill { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.drill b { display: block; font-size: 13.5px; font-weight: 650; }
+.drill .t-micro { display: block; margin-top: 2px; line-height: 1.45; }
+.drill .switch { margin-top: 2px; }

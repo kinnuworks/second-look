@@ -27,6 +27,7 @@ export class OtariError extends Error {
     public code: string,
     message: string,
     public proof: Proof,
+    public body?: any,
   ) {
     super(message);
   }
@@ -103,7 +104,7 @@ async function post(
     const msg =
       (typeof err === "object" && err?.message) ||
       (typeof err === "string" ? err : JSON.stringify(err)).slice(0, 400);
-    throw new OtariError(res.status, String(code), String(msg), proof);
+    throw new OtariError(res.status, String(code), String(msg), proof, json);
   }
   return { json, proof };
 }

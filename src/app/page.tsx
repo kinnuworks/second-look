@@ -37,7 +37,7 @@ const STEP_FEATURE: Record<string, string> = {
   extract: "Qwen3 235B · sl-reader routing policy · guardrail (monitor)",
   research: "Qwen3 235B · Otari web search · MCP: evidence server",
   fetch: "Otari web fetch",
-  page: "Qwen3 235B · guardrail (block)",
+  page: "Qwen3 235B · guardrail (block), judged by gpt-oss-safeguard-120b",
   score: "Otari code execution sandbox",
   verdict: "gpt-oss-120b",
 };
@@ -198,6 +198,7 @@ export default function Home() {
   const [budgetHit, setBudgetHit] = useState(false);
   const [left, setLeft] = useState<number | null>(null);
   const [ran, setRan] = useState(false);
+  const [drill, setDrill] = useState(false);
   const host = useRef("");
   const toolRef = useRef<HTMLDivElement>(null);
 
@@ -231,7 +232,7 @@ export default function Home() {
     setBudgetHit(false);
     if (window.innerWidth < 900) toolRef.current?.querySelector(".tool__output")?.scrollIntoView({ behavior: "smooth", block: "start" });
     try {
-      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input }) });
+      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input, drill }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `status ${res.status}`);
@@ -350,6 +351,13 @@ export default function Home() {
                         Red dots are written like real scams consumer groups have warned about; their links are made up. Green dots are genuine messages. The orange one opens a test page we host that hides instructions for AI checkers.
                       </p>
                     </div>
+                    <label className="drill">
+                      <input type="checkbox" className="switch" checked={drill} onChange={(e) => setDrill(e.target.checked)} disabled={busy} />
+                      <span>
+                        <b>Fallback drill</b>
+                        <span className="t-micro">Start the reading step on a model that can&apos;t do JSON mode, so Otari falls back to the backup. The receipts show the fallback.</span>
+                      </span>
+                    </label>
                     <div className="privacy-note">
                       {I.lock}
                       <span>We mask names and account numbers before anything leaves our server, and we don&apos;t store your message. Links and phone numbers stay in, because they&apos;re the evidence.</span>
@@ -453,7 +461,7 @@ export default function Home() {
               ["Reads and researches", "Qwen3 235B Instruct", "alibaba · via DeepInfra", "Pulls out the sender, the ask and the links, then searches and calls the evidence server."],
               ["Backup", "Gemma 3 27B", "google · via Nebius", "Takes over through the sl-reader routing policy if Qwen's provider fails."],
               ["Writes the answer", "gpt-oss-120b", "openai · via DeepInfra", "Turns the evidence into a short verdict for someone who isn't technical."],
-              ["Guards", "Qwen3Guard 8B", "alibaba · via OVHcloud", "Runs inside our guardrail service and screens text for instructions planted for AI readers."],
+              ["Guards", "gpt-oss-safeguard-120b", "openai · via Amazon Bedrock", "Runs inside our guardrail service and decides, against a written policy, whether text carries instructions aimed at AI readers."],
             ].map(([role, name, who, p], i) => (
               <div key={i} className="model reveal" style={{ ["--i" as any]: i }}>
                 <div className="model__role">{role}</div>
@@ -475,7 +483,7 @@ export default function Home() {
               ["Is it always right?", "No. It works from public evidence, and brand-new scam domains are often missing from phishing lists. A small company with little web presence can look suspicious. Treat it as a second opinion, and when money is involved, contact the company through its real website."],
               ["Why do some links not open?", "Scam pages are often taken down within hours of being reported. A dead link is reported as such; the domain's age and the lookalike check still count."],
               ["What should I do if it's a scam?", "Don't tap the link or reply. In the UK, forward scam texts to 7726. In the US, report them at reportfraud.ftc.gov. If you already paid or shared details, call your bank on the number on your card."],
-              ["Which models do the work?", "Qwen3 235B reads and researches, Gemma 3 27B is the backup, gpt-oss-120b writes the answer and Qwen3Guard 8B screens for planted instructions. All are open-weight and run through Mozilla's Otari gateway."],
+              ["Which models do the work?", "Qwen3 235B reads and researches, Gemma 3 27B is the backup, gpt-oss-120b writes the answer and gpt-oss-safeguard-120b screens for planted instructions. The fallback drill starts on Qwen3Guard 8B, which refuses JSON mode. All are open-weight and run through Mozilla's Otari gateway."],
               ["Why is there a daily limit?", "Each check costs about two cents in model and search fees. A small daily budget per visitor keeps it free for everyone."],
             ].map(([q, a]) => (
               <details key={q}><summary>{q}</summary><p>{a}</p></details>

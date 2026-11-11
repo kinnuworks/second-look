@@ -69,8 +69,11 @@ type Extracted = {
   channel: string | null;
 };
 
-function errDetail(e: unknown): { code: string; message: string; proof?: Proof } {
-  if (e instanceof OtariError) return { code: e.code, message: e.message, proof: e.proof };
+function errDetail(e: unknown): { code: string; message: string; proof?: Proof; why?: string } {
+  if (e instanceof OtariError) {
+    const g = e.body?.detail?.guardrails?.[0];
+    return { code: e.code, message: e.message, proof: e.proof, why: g?.explanation ?? undefined };
+  }
   return { code: "error", message: (e as Error)?.message ?? String(e) };
 }
 
@@ -78,7 +81,7 @@ function isBudgetError(code: string) {
   return /budget_exceeded|end_user_limit_reached|user_blocked|end_user_budget/i.test(code);
 }
 
-export async function runCheck(input: string, visitor: string, emit: Emit) {
+export async function runCheck(input: string, visitor: string, emit: Emit, opts: { drill?: boolean } = {}) {
   const proofs: Proof[] = [];
   const keep = (p?: Proof | null) => p && proofs.push(p);
 
@@ -92,7 +95,8 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
   try {
     const r = await chat({
       step: "extract",
-      model: MODELS.extract,
+      // The drill policy starts on a model that refuses JSON mode, so Otari falls back.
+      model: opts.drill ? (process.env.DRILL_MODEL ?? "sl-drill") : MODELS.extract,
       visitor,
       json: true,
       guardrails: guardrail("monitor"),
@@ -115,7 +119,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
     if (!j) throw new Error("The model's reply wasn't valid JSON");
     const found = findLinks(masked);
     ex = { ...j, links: Array.from(new Set([...(j.links ?? []).map((l) => (/^https?:\/\//i.test(l) ? l : `https://${l}`)), ...found])).slice(0, 3) };
-    emit({ type: "step", id: "extract", status: "done", label: "Read the message", data: ex, proof: r.proof });
+    emit({ type: "step", id: "extract", status: "done", label: r.proof.fallback === "true" ? `Read the message (Otari fell back to ${r.proof.servedModel ?? "the backup"} on attempt ${r.proof.attempts ?? "2"})` : "Read the message", data: ex, proof: r.proof });
   } catch (e) {
     const d = errDetail(e);
     keep(d.proof);
@@ -253,7 +257,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
           keep(d.proof);
           if (d.code === "guardrail_violation" || d.proof?.status === 403) {
             page = { ...page, status: "blocked" };
-            emit({ type: "step", id: "page", status: "done", label: "Blocked: the page tries to give instructions to AI checkers", detail: "Otari's guardrail stopped this page before any model read it.", proof: d.proof });
+            emit({ type: "step", id: "page", status: "done", label: "Blocked: the page tries to give instructions to AI checkers", detail: `Otari's guardrail refused this request before any model read the page.${d.why ? ` Reason given: ${d.why}` : ""}`, proof: d.proof });
           } else {
             emit({ type: "step", id: "page", status: "error", label: "Couldn't read the page", detail: d.message, proof: d.proof });
           }
