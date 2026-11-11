@@ -58,7 +58,10 @@ async function post(
     Authorization: `Bearer ${key()}`,
     "Content-Type": "application/json",
   };
-  if (visitor && process.env.OTARI_END_USER_BUDGET_ID) {
+  if (visitor?.startsWith("drill_") && process.env.OTARI_DRILL_BUDGET_ID) {
+    // Budget drill: a separate end user on a budget too small for any request.
+    headers["Otari-End-User-Budget"] = process.env.OTARI_DRILL_BUDGET_ID;
+  } else if (visitor && process.env.OTARI_END_USER_BUDGET_ID) {
     // Puts a new visitor on the demo's per-visitor budget.
     headers["Otari-End-User-Budget"] = process.env.OTARI_END_USER_BUDGET_ID;
   }
@@ -67,6 +70,8 @@ async function post(
     method: "POST",
     headers,
     body: JSON.stringify(visitor ? { ...body, user: visitor } : body),
+    // Never let one slow provider hang a check past the function limit.
+    signal: AbortSignal.timeout(Number(process.env.OTARI_TIMEOUT_MS ?? "75000")),
   });
   const ms = Date.now() - t0;
   const text = await res.text();

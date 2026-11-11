@@ -36,6 +36,12 @@ export const SAMPLES: Sample[] = [
     text: "PayPal: Your account has been limited. Confirm your identity to restore access: https://{HOST}/test/limited-account",
   },
   {
+    id: "test-live",
+    label: "Test: live fake parcel page",
+    kind: "test",
+    text: "Royal Mail: We could not deliver your parcel. A £1.20 redelivery fee is due. Rebook within 24 hours: https://{HOST}/test/redelivery",
+  },
+  {
     id: "real-delivery",
     label: "Real delivery update",
     kind: "genuine",

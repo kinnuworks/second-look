@@ -28,6 +28,8 @@ type Verdict = {
   why: string[];
   what_to_do: string[];
   official: { domain: string | null; scam_warning_url: string | null; scam_warning_summary: string | null };
+  code?: string;
+  stdout?: string;
 };
 
 const BAND_TEXT: Record<Band, string> = { likely_scam: "Likely scam", suspicious: "Be careful", looks_genuine: "Looks genuine" };
@@ -144,7 +146,7 @@ function ProofTable({ proofs, example }: { proofs: Proof[]; example: boolean }) 
   );
 }
 
-function VerdictCard({ v, example }: { v: Verdict; example: boolean }) {
+function VerdictCard({ v, example, onCopy, copied }: { v: Verdict; example: boolean; onCopy?: () => void; copied?: boolean }) {
   return (
     <div className={`verdict verdict--${v.band}`}>
       <div className="verdict__top">
@@ -156,6 +158,9 @@ function VerdictCard({ v, example }: { v: Verdict; example: boolean }) {
         </span>
       </div>
       <h3>{v.headline ?? BAND_TEXT[v.band]}</h3>
+      {onCopy && (
+        <button className="btn btn-outline btn-sm copy-btn" onClick={onCopy}>{copied ? "Copied" : "Copy this answer to send on"}</button>
+      )}
       <p className="t-micro" style={{ marginTop: -6, marginBottom: 12 }}>Red-flag score: 50 or more means likely scam, 25 to 49 means be careful, under 25 looks genuine.</p>
       <div className="verdict__cols">
         {v.why.length > 0 && (
@@ -183,6 +188,13 @@ function VerdictCard({ v, example }: { v: Verdict; example: boolean }) {
           {v.fired.length ? v.fired.map((f) => <li key={f.flag}>{f.weight > 0 ? "+" : ""}{f.weight} · {f.label}</li>) : <li>No red flags.</li>}
         </ul>
         <p style={{ marginTop: 8 }}>50 or more: likely scam. 25 to 49: be careful. Under 25: looks genuine.</p>
+        {v.code && (
+          <>
+            <div className="verdict__label" style={{ marginTop: 10 }}>The Python Otari ran in its sandbox</div>
+            <pre className="code">{v.code}</pre>
+            {v.stdout && (<><div className="verdict__label">What it printed</div><pre className="code">{v.stdout}</pre></>)}
+          </>
+        )}
       </details>
     </div>
   );
@@ -199,6 +211,9 @@ export default function Home() {
   const [left, setLeft] = useState<number | null>(null);
   const [ran, setRan] = useState(false);
   const [drill, setDrill] = useState(false);
+  const [budgetDrill, setBudgetDrill] = useState(false);
+  const [budgetMsg, setBudgetMsg] = useState<{ detail?: string; drill?: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
   const host = useRef("");
   const toolRef = useRef<HTMLDivElement>(null);
 
@@ -230,9 +245,11 @@ export default function Home() {
     setProofs([]);
     setError(null);
     setBudgetHit(false);
+    setBudgetMsg(null);
+    setCopied(false);
     if (window.innerWidth < 900) toolRef.current?.querySelector(".tool__output")?.scrollIntoView({ behavior: "smooth", block: "start" });
     try {
-      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input, drill }) });
+      const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input, drill, budgetDrill }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `status ${res.status}`);
@@ -259,7 +276,7 @@ export default function Home() {
               return next;
             });
           } else if (ev.type === "verdict") setVerdict(ev);
-          else if (ev.type === "budget") setBudgetHit(true);
+          else if (ev.type === "budget") { setBudgetHit(true); setBudgetMsg({ detail: ev.detail, drill: ev.drill }); }
           else if (ev.type === "end") setProofs(ev.proofs ?? []);
           else if (ev.type === "fatal") setError(ev.message);
         }
@@ -270,6 +287,21 @@ export default function Home() {
       setBusy(false);
       loadBudget();
     }
+  }
+
+  async function copyAnswer() {
+    if (!verdict) return;
+    const lines = [
+      `Second Look: ${verdict.headline ?? BAND_TEXT[verdict.band]} (red-flag score ${verdict.score}/100)`,
+      ...(verdict.why.length ? ["", "Why:", ...verdict.why.map((w) => `- ${w}`)] : []),
+      ...(verdict.what_to_do.length ? ["", "What to do:", ...verdict.what_to_do.map((w) => `- ${w}`)] : []),
+      "",
+      `Checked at ${window.location.origin}`,
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+    } catch {}
   }
 
   function trySample(t: string) {
@@ -348,7 +380,7 @@ export default function Home() {
                         ))}
                       </div>
                       <p className="t-micro" style={{ marginTop: 10 }}>
-                        Red dots are written like real scams consumer groups have warned about; their links are made up. Green dots are genuine messages. The orange one opens a test page we host that hides instructions for AI checkers.
+                        Red dots are written like real scams consumer groups have warned about; their links are made up. Green dots are genuine messages. Orange dots link to test pages we host: one hides instructions for AI checkers, the other is an ordinary fake fee page.
                       </p>
                     </div>
                     <label className="drill">
@@ -358,9 +390,16 @@ export default function Home() {
                         <span className="t-micro">Start the reading step on a model that can&apos;t do JSON mode, so Otari falls back to the backup. The receipts show the fallback.</span>
                       </span>
                     </label>
+                    <label className="drill">
+                      <input type="checkbox" className="switch" checked={budgetDrill} onChange={(e) => setBudgetDrill(e.target.checked)} disabled={busy} />
+                      <span>
+                        <b>Budget drill</b>
+                        <span className="t-micro">Run the check as a separate visitor whose daily budget is too small for any request, and watch Otari refuse it.</span>
+                      </span>
+                    </label>
                     <div className="privacy-note">
                       {I.lock}
-                      <span>We mask names and account numbers before anything leaves our server, and we don&apos;t store your message. Links and phone numbers stay in, because they&apos;re the evidence.</span>
+                      <span>We mask names and account numbers before anything leaves our server, and we don&apos;t keep your message. To run the check it passes through Otari and the model providers it routes to. Links and phone numbers stay in, because they&apos;re the evidence.</span>
                     </div>
                   </div>
 
@@ -368,8 +407,13 @@ export default function Home() {
                     {showExample && <span className="example-tag">Example result · the parcel-fee text, checked on the live site</span>}
                     {showExample && <p className="t-micro" style={{ marginTop: -8 }}>&ldquo;{EXAMPLE_TEXT}&rdquo;</p>}
                     {error && <div className="alert alert--err">We couldn&apos;t finish this check. Try again in a minute. <span className="t-micro">({error})</span></div>}
-                    {budgetHit && <div className="alert alert--warn">You&apos;ve used today&apos;s free checks. They come back at midnight UTC.</div>}
-                    {shownVerdict && <VerdictCard v={shownVerdict} example={showExample} />}
+                    {budgetHit && (
+                      <div className="alert alert--warn">
+                        {budgetMsg?.drill ? <b>Budget drill: Otari refused this check before any model ran.</b> : <>You&apos;ve used today&apos;s free checks. They come back at midnight UTC.</>}
+                        {budgetMsg?.detail && <div className="t-micro" style={{ marginTop: 6 }}>Otari said: &ldquo;{budgetMsg.detail}&rdquo;</div>}
+                      </div>
+                    )}
+                    {shownVerdict && <VerdictCard v={shownVerdict} example={showExample} onCopy={showExample ? undefined : copyAnswer} copied={copied} />}
                     {!showExample && steps.length > 0 && (
                       <div>
                         <div className="verdict__label">{busy ? "Checking now" : "What we checked"}</div>
@@ -479,7 +523,7 @@ export default function Home() {
           <div className="section-head"><h2>Questions.</h2></div>
           <div className="faq">
             {[
-              ["Do you keep my message?", "No. We mask names and account numbers on our server, send the rest to the models through Otari to do the check, and don't store it. Links and phone numbers stay in because they're what we check."],
+              ["Do you keep my message?", "We don't. Names and account numbers are masked on our server first; the rest passes through Otari and the model providers it routes to, which is how the check runs. Links and phone numbers stay in because they're what we check."],
               ["Is it always right?", "No. It works from public evidence, and brand-new scam domains are often missing from phishing lists. A small company with little web presence can look suspicious. Treat it as a second opinion, and when money is involved, contact the company through its real website."],
               ["Why do some links not open?", "Scam pages are often taken down within hours of being reported. A dead link is reported as such; the domain's age and the lookalike check still count."],
               ["What should I do if it's a scam?", "Don't tap the link or reply. In the UK, forward scam texts to 7726. In the US, report them at reportfraud.ftc.gov. If you already paid or shared details, call your bank on the number on your card."],

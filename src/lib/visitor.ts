@@ -1,17 +1,16 @@
-import { cookies } from "next/headers";
-import { createHash, randomUUID } from "node:crypto";
+import { headers } from "next/headers";
+import { createHash } from "node:crypto";
 
-// Each visitor gets an anonymous id (a random cookie, hashed) that Otari uses
-// as the end user, so per-visitor budgets apply with no signup.
-export async function visitorId(): Promise<{ id: string; fresh: string | null }> {
-  const jar = await cookies();
-  let raw = jar.get("sl_v")?.value ?? null;
-  let fresh: string | null = null;
-  if (!raw) {
-    raw = randomUUID();
-    fresh = raw;
-  }
-  const id = "v_" + createHash("sha256").update(raw).digest("hex").slice(0, 24);
-  return { id, fresh };
+// Each visitor is an Otari end user with a daily budget. The id is a salted hash
+// of the visitor's network address, so clearing cookies or calling the API
+// directly doesn't reset the allowance, and no address is ever sent to Otari.
+export async function visitorId(): Promise<{ id: string }> {
+  const h = await headers();
+  const ip =
+    h.get("x-real-ip") ??
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "local";
+  const salt = process.env.VISITOR_SALT ?? process.env.GUARD_TOKEN ?? "second-look";
+  const id = "v_" + createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 24);
+  return { id };
 }
-

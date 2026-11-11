@@ -81,7 +81,10 @@ function isBudgetError(code: string) {
   return /budget_exceeded|end_user_limit_reached|user_blocked|end_user_budget/i.test(code);
 }
 
-export async function runCheck(input: string, visitor: string, emit: Emit, opts: { drill?: boolean } = {}) {
+export async function runCheck(input: string, visitorIn: string, emit: Emit, opts: { drill?: boolean; budgetDrill?: boolean } = {}) {
+  // Budget drill: the same check as a separate end user whose budget is too small
+  // for any request, so Otari refuses it before a model runs.
+  const visitor = opts.budgetDrill ? `drill_${visitorIn}` : visitorIn;
   const proofs: Proof[] = [];
   const keep = (p?: Proof | null) => p && proofs.push(p);
 
@@ -124,7 +127,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit, opts:
     const d = errDetail(e);
     keep(d.proof);
     emit({ type: "step", id: "extract", status: "error", label: "Couldn't read the message", detail: d.message, proof: d.proof });
-    if (isBudgetError(d.code)) emit({ type: "budget", code: d.code });
+    if (isBudgetError(d.code)) emit({ type: "budget", code: d.code, detail: d.message, drill: !!opts.budgetDrill });
     emit({ type: "end", ok: false, proofs });
     return;
   }
@@ -149,7 +152,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit, opts:
           model: MODELS.research,
           visitor,
           maxTokens: 1500,
-          tools: [{ type: "otari_web_search" }],
+          tools: [{ type: "otari_web_search", max_uses: 2 }],
           extra: { max_tool_iterations: 6, ...(mcpServerIds().length ? { mcp_server_ids: mcpServerIds() } : {}) },
           messages: [
             {
@@ -251,7 +254,8 @@ export async function runCheck(input: string, visitor: string, emit: Emit, opts:
           keep(r.proof);
           const j = parseJson<any>(r.content) ?? {};
           page = { ...page, asks_card: !!j.asks_card, asks_login: !!j.asks_login, summary: j.summary ?? null };
-          emit({ type: "step", id: "page", status: "done", label: j.summary ?? "Read the page", data: j, proof: r.proof });
+          const gv = Array.isArray(r.proof.guardrails) ? r.proof.guardrails.find((g: any) => g.mode === "block") : null;
+        emit({ type: "step", id: "page", status: "done", label: j.summary ?? "Read the page", detail: gv?.status === "evaluated" && gv.valid ? "Otari's guardrail checked this page first and found no instructions aimed at AI readers." : undefined, data: j, proof: r.proof });
         } catch (e) {
           const d = errDetail(e);
           keep(d.proof);
@@ -295,14 +299,14 @@ export async function runCheck(input: string, visitor: string, emit: Emit, opts:
     sender_matches_official: !!official.domain && anyLink && links.every((l) => l.compare?.same_site),
   };
   emit({ type: "step", id: "score", status: "running", label: "Scoring the red flags in a sandbox" });
-  let scored: { score: number; band: string; fired: { flag: string; weight: number; label: string }[]; where: string };
+  let scored: { score: number; band: string; fired: { flag: string; weight: number; label: string }[]; where: string; code?: string; stdout?: string };
   try {
     const r = await codeExecute("score", scoreScript(evidence), visitor);
     keep(r.proof);
     const out = String(r.json?.stdout ?? r.json?.output ?? "");
     const j = parseJson<any>(out);
     if (!j) throw new Error(`sandbox output wasn't JSON: ${out.slice(0, 120)}`);
-    scored = { ...j, where: "Otari sandbox" };
+    scored = { ...j, where: "Otari sandbox", code: scoreScript(evidence), stdout: out.trim() };
     emit({ type: "step", id: "score", status: "done", label: `Red-flag score ${j.score}/100`, data: { ...scored, evidence }, proof: r.proof });
   } catch (e) {
     const d = errDetail(e);
@@ -337,7 +341,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit, opts:
     const j = parseJson<any>(r.content);
     if (!j) throw new Error("The model's reply wasn't valid JSON");
     emit({ type: "step", id: "verdict", status: "done", label: "Answer ready", proof: r.proof });
-    emit({ type: "verdict", band: scored.band, score: scored.score, fired: scored.fired, scoredWhere: scored.where, headline: j.headline, why: j.why ?? [], what_to_do: j.what_to_do ?? [], official, links, page, facts: ex });
+    emit({ type: "verdict", band: scored.band, score: scored.score, fired: scored.fired, scoredWhere: scored.where, code: scored.code, stdout: scored.stdout, headline: j.headline, why: j.why ?? [], what_to_do: j.what_to_do ?? [], official, links, page, facts: ex });
   } catch (e) {
     const d = errDetail(e);
     keep(d.proof);
