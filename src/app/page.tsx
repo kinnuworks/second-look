@@ -433,7 +433,7 @@ export default function Home() {
           </p>
           <div className="trust"><span>Free: 15¢ a day each</span><span>No account</span><span>Names and account numbers are masked first</span></div>
 
-          <div className="hero__visual tool-stage" id="tool" ref={toolRef}>
+          <div className={`hero__visual tool-stage${ran ? " has-run" : ""}`} id="tool" ref={toolRef}>
             <div className="stage">
               <div className="float float--sms" aria-hidden="true">
                 <div className="float__row"><span className="float__app">Messages</span><span className="float__time">now</span></div>

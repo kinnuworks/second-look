@@ -195,3 +195,6 @@
 .live__dot{width:8px;height:8px;border-radius:50%;background:var(--scam);box-shadow:0 0 0 0 color-mix(in oklab,var(--scam) 60%,transparent);animation:livepulse 1.6s infinite}
 @keyframes livepulse{0%{box-shadow:0 0 0 0 color-mix(in oklab,var(--scam) 55%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
 @media (prefers-reduced-motion:reduce){.live__dot{animation:none}}
+/* Once a real check runs, the decorative cards step aside so they never sit on a real result */
+.tool-stage .float { transition: opacity var(--dur-ui) var(--ease-out); }
+.tool-stage.has-run .float { opacity: 0; pointer-events: none; }
