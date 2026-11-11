@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 // Picks a phishing link from today's OpenPhish community feed whose page still
 // loads, so a visitor can watch a check run on a real, live scam page.
 const FEED = "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt";
+// Pages on shared hosting, and "clone" projects, are often student work that a
+// feed flags; prefer standalone domains registered for the scam.
+const SHARED = /github\.io|vercel\.app|netlify\.app|pages\.dev|web\.app|firebaseapp|amazonaws\.com|blogspot|wixsite|weebly|glitch\.me|onrender\.com|workers\.dev|clone/i;
 const BRANDS = /paypal|apple|icloud|microsoft|office|outlook|netflix|amazon|dhl|usps|fedex|royal|post|bank|chase|wells|hsbc|barclays|santander|coinbase|binance|metamask|facebook|meta|instagram|whatsapp|login|signin|verify|secure|account|wallet/i;
 
 let cache: { at: number; urls: string[] } | null = null;
@@ -49,9 +52,10 @@ export async function GET() {
   } catch (e) {
     return Response.json({ error: `OpenPhish feed unavailable: ${(e as Error).message}` }, { status: 503 });
   }
-  const branded = shuffle(urls.filter((u) => BRANDS.test(u)));
-  const rest = shuffle(urls.filter((u) => !BRANDS.test(u)));
-  const pool = [...branded, ...rest];
+  const own = urls.filter((u) => !SHARED.test(u));
+  const branded = shuffle(own.filter((u) => BRANDS.test(u)));
+  const rest = shuffle(own.filter((u) => !BRANDS.test(u)));
+  const pool = [...branded, ...rest, ...shuffle(urls.filter((u) => SHARED.test(u)))];
   for (let i = 0; i < Math.min(pool.length, 24); i += 8) {
     const batch = pool.slice(i, i + 8);
     const ok = await Promise.all(batch.map(alive));
