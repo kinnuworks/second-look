@@ -103,6 +103,7 @@ async function post(
   if (!res.ok) {
     const err = json?.error ?? json?.detail ?? json;
     const code =
+      (typeof json?.code === "string" && json.code) ||
       (typeof err === "object" && (err?.code || err?.type)) ||
       (typeof json?.detail === "object" && json.detail?.code) ||
       `http_${res.status}`;

@@ -126,7 +126,7 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
   } catch (e) {
     const d = errDetail(e);
     keep(d.proof);
-    emit({ type: "step", id: "extract", status: "error", label: "Couldn't read the message", detail: d.message, proof: d.proof });
+    emit({ type: "step", id: "extract", status: "error", label: isBudgetError(d.code) ? "Otari refused: this visitor's budget is used up" : "Couldn't read the message", detail: d.message, proof: d.proof });
     if (isBudgetError(d.code)) emit({ type: "budget", code: d.code, detail: d.message, drill: !!opts.budgetDrill });
     emit({ type: "end", ok: false, proofs });
     return;
@@ -153,7 +153,7 @@ export async function runCheck(input: string, visitorIn: string, emit: Emit, opt
           visitor,
           maxTokens: 1500,
           tools: [{ type: "otari_web_search", max_uses: 2 }],
-          extra: { max_tool_iterations: 6, ...(mcpServerIds().length ? { mcp_server_ids: mcpServerIds() } : {}) },
+          extra: { max_tool_iterations: 4, ...(mcpServerIds().length ? { mcp_server_ids: mcpServerIds() } : {}) },
           messages: [
             {
               role: "system",
