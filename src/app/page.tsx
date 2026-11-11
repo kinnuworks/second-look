@@ -272,12 +272,13 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [budgetHit, setBudgetHit] = useState(false);
   const [allow, setAllow] = useState<Allowance | null>(null);
-  const [costs, setCosts] = useState<{ full: number; quick: number }>({ full: 0.032, quick: 0.011 });
+  const [costs, setCosts] = useState<{ full: number; quick: number }>({ full: 0.038, quick: 0.011 });
   const [depthPick, setDepthPick] = useState<"full" | "quick">("full");
   const [charge, setCharge] = useState<Charge | null>(null);
   const [ran, setRan] = useState(false);
   const [drill, setDrill] = useState(false);
   const [budgetDrill, setBudgetDrill] = useState(false);
+  const [live, setLive] = useState<{ state: "idle" | "finding" | "ready" | "none"; host?: string; feedSize?: number; msg?: string }>({ state: "idle" });
   const [budgetMsg, setBudgetMsg] = useState<{ detail?: string; drill?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const host = useRef("");
@@ -377,6 +378,21 @@ export default function Home() {
     } catch {}
   }
 
+  async function tryLive() {
+    setLive({ state: "finding" });
+    try {
+      const r = await fetch("/api/live-sample", { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok || !j.url) { setLive({ state: "none", msg: j.error ?? "No live link right now." }); return; }
+      setLive({ state: "ready", host: j.host, feedSize: j.feedSize });
+      const t = `Got a message with this link and I'm not sure about it: ${j.url}`;
+      setText(t);
+      check(t);
+    } catch {
+      setLive({ state: "none", msg: "Couldn't reach the phishing feed. Try again in a minute." });
+    }
+  }
+
   function trySample(t: string) {
     const filled = t.replace("{HOST}", host.current);
     setText(filled);
@@ -413,9 +429,9 @@ export default function Home() {
             Is this text a scam? <span className="t-muted">Paste it and <em className="t-serif">see</em>.</span>
           </h1>
           <p className="lead">
-            Second Look opens the link, finds the company&apos;s real website and checks how old the domain is. Then it tells you, in plain words, whether to trust the message.
+            Open-weight models on Otari open the link, find the company&apos;s real website and check how old the domain is, then tell you in plain words whether to trust the message. Each visitor gets their own free daily Otari budget, and you can watch it go down.
           </p>
-          <div className="trust"><span>Free</span><span>No account</span><span>Names and account numbers are masked first</span></div>
+          <div className="trust"><span>Free: 15¢ a day each</span><span>No account</span><span>Names and account numbers are masked first</span></div>
 
           <div className="hero__visual tool-stage" id="tool" ref={toolRef}>
             <div className="stage">
@@ -456,6 +472,19 @@ export default function Home() {
                         {busy ? "Checking…" : "Check this message"}
                       </button>
                       <span className="t-micro">or press <kbd>⌘</kbd> <kbd>↵</kbd></span>
+                    </div>
+                    <div className="live">
+                      <button className="btn btn-outline btn-sm" onClick={tryLive} disabled={busy || live.state === "finding"}>
+                        <span className="live__dot" aria-hidden="true" />
+                        {live.state === "finding" ? "Finding a live scam page…" : "Check a real scam link from today"}
+                      </button>
+                      <p className="t-micro">
+                        {live.state === "ready"
+                          ? <>Picked a page that is up right now on <b>{live.host}</b>, from the {live.feedSize} links on today&apos;s OpenPhish community feed. It&apos;s shown as text only. Don&apos;t open it.</>
+                          : live.state === "none"
+                          ? live.msg
+                          : <>Takes a phishing link reported today on the OpenPhish feed whose page still loads, and runs the full check on it: Otari fetches the page and the guardrail reads it before any model does.</>}
+                      </p>
                     </div>
                     <div className="examples">
                       <div className="field-label" style={{ marginBottom: 8 }}>No message to hand? Try one:</div>
@@ -644,7 +673,7 @@ export default function Home() {
               ["Why do some links not open?", "Scam pages are often taken down within hours of being reported. A dead link is reported as such; the domain's age and the lookalike check still count."],
               ["What should I do if it's a scam?", "Don't tap the link or reply. In the UK, forward scam texts to 7726. In the US, report them at reportfraud.ftc.gov. If you already paid or shared details, call your bank on the number on your card."],
               ["Which models do the work?", "Qwen3 235B reads and researches, Gemma 3 27B is the backup, gpt-oss-120b writes the answer and gpt-oss-safeguard-120b screens for planted instructions. The fallback drill starts on Qwen3Guard 8B, which refuses JSON mode. All are open-weight and run through Mozilla's Otari gateway."],
-              ["Why is there a daily limit?", "A full check costs about three cents in model, search and fetch fees, and a quick check about one cent. Each visitor gets 15 cents a day as an Otari end-user budget, so the tool stays free for everyone and nobody can run up the bill."],
+              ["Why is there a daily limit?", "A full check costs three to four cents in model, search and fetch fees, and a quick check about one cent. Each visitor gets 15 cents a day as an Otari end-user budget, so the tool stays free for everyone and nobody can run up the bill."],
             ].map(([q, a]) => (
               <details key={q}><summary>{q}</summary><p>{a}</p></details>
             ))}
@@ -660,7 +689,7 @@ export default function Home() {
             <a href="#tool" className="btn btn-candy btn-lg">Check a message</a>
             <a href="https://github.com/kinnuworks/second-look" className="btn btn-outline btn-lg" target="_blank" rel="noreferrer">Read the code</a>
           </div>
-          <div className="trust"><span>Free</span><span>No account</span><span>Open-weight models through Otari</span></div>
+          <div className="trust"><span>Free: 15¢ a day each</span><span>No account</span><span>Open-weight models through Otari</span></div>
         </div>
       </section>
 

@@ -45,7 +45,7 @@ let feed: { at: number; urls: Set<string>; hosts: Set<string> } | null = null;
 
 async function loadFeed() {
   if (feed && Date.now() - feed.at < 30 * 60_000) return feed;
-  const r = await fetch("https://openphish.com/feed.txt", { signal: AbortSignal.timeout(8000) });
+  const r = await fetch("https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt", { signal: AbortSignal.timeout(8000) });
   const lines = (await r.text()).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   feed = {
     at: Date.now(),

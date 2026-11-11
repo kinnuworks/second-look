@@ -11,7 +11,7 @@ export type Allowance = {
   source: "otari" | "new visitor" | "estimate";
 };
 
-export const FULL_CHECK_USD = Number(process.env.CHECK_COST_ESTIMATE ?? "0.032");
+export const FULL_CHECK_USD = Number(process.env.CHECK_COST_ESTIMATE ?? "0.038");
 export const QUICK_CHECK_USD = Number(process.env.QUICK_CHECK_COST_ESTIMATE ?? "0.011");
 
 const defaultMax = () => Number(process.env.VISITOR_BUDGET_USD ?? "0.15");

@@ -189,3 +189,9 @@
 .final-cta { background: var(--wallpaper-soft); }
 .final-cta__icon { width: 88px; height: 88px; border-radius: 22.5%; margin: 0 auto 24px; box-shadow: var(--shadow-2); }
 .final-cta h2 { max-width: 760px; margin-inline: auto; }
+
+.live{display:flex;flex-direction:column;gap:8px;margin-top:18px;padding:14px;border-radius:var(--r-md);background:var(--surface-2);box-shadow:var(--ring)}
+.live .btn{align-self:flex-start}
+.live__dot{width:8px;height:8px;border-radius:50%;background:var(--scam);box-shadow:0 0 0 0 color-mix(in oklab,var(--scam) 60%,transparent);animation:livepulse 1.6s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 color-mix(in oklab,var(--scam) 55%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+@media (prefers-reduced-motion:reduce){.live__dot{animation:none}}
