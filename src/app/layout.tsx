@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   title: "Second Look: is this text a scam?",
   description: "Paste a text or email you're not sure about. Second Look checks the link, the sender and the real company's website, then tells you in plain words whether to trust it.",
   icons: { icon: "/icon.png", apple: "/icon.png" },
+  metadataBase: new URL(process.env.PUBLIC_BASE_URL ?? "https://second-look-phi.vercel.app"),
+  openGraph: {
+    title: "Second Look: is this text a scam?",
+    description: "Paste a text you're not sure about. Open-weight models through Mozilla's Otari check the link, the sender and the real company's site, then tell you in plain words.",
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Second Look showing a parcel-fee text marked as very likely a scam, with the reasons" }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og.jpg"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
