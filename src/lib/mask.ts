@@ -17,6 +17,12 @@ export function maskMessage(text: string): { masked: string; count: number } {
   // Email addresses that aren't the sender's domain evidence: keep domain, mask name.
   sub(/\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g, "[name]@$2");
   // Greetings with a name: "Dear John Smith," / "Hi Sarah,"
-  sub(/\b(Dear|Hi|Hello|Hey)\s+(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?/g, "$1 [name]");
+  // Keep family words and generic greetings: "Hi Mum" is evidence, not a name.
+  const KEEP = /^(Mum|Mom|Mam|Mummy|Mommy|Dad|Daddy|Mother|Father|Nan|Nana|Gran|Granny|Grandma|Grandpa|Grandad|Son|Daughter|Sis|Bro|Babe|Love|Darling|Sweetie|Honey|Sir|Madam|Customer|Member|There|All|Team|Friend)$/i;
+  text = text.replace(/\b(Dear|Hi|Hello|Hey)\s+((?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?)\s+)?([A-Z][a-z]+)(\s+[A-Z][a-z]+)?/g, (m, g, title, first) => {
+    if (!title && KEEP.test(first)) return m;
+    count++;
+    return `${g} [name]`;
+  });
   return { masked: text, count };
 }

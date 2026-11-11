@@ -316,6 +316,7 @@ export async function runCheck(input: string, visitor: string, emit: Emit) {
       visitor,
       json: true,
       maxTokens: 900,
+      extra: { reasoning_effort: "low" },
       messages: [
         {
           role: "system",
