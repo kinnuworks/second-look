@@ -293,7 +293,7 @@ export default function Home() {
             <a href="#models">The models</a>
             <a href="#faq">FAQ</a>
           </div>
-          <a href="#tool" className="btn btn-ink btn-sm">Check a message</a>
+          <a href="#tool" className="btn btn-candy btn-sm">Check a message</a>
         </div>
       </nav>
 
@@ -329,7 +329,7 @@ export default function Home() {
                       onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") check(text); }}
                     />
                     <div className="tool__actions">
-                      <button className="btn btn-ink" onClick={() => check(text)} disabled={busy || text.trim().length < 8}>
+                      <button className="btn btn-candy" onClick={() => check(text)} disabled={busy || text.trim().length < 8}>
                         {busy ? "Checking…" : "Check this message"}
                       </button>
                       <span className="t-micro">or press <kbd>⌘</kbd> <kbd>↵</kbd></span>
