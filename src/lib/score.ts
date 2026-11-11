@@ -9,9 +9,10 @@ export const SCORE_WEIGHTS = [
   ["asks_payment", 15, "Asks you to pay"],
   ["asks_credentials", 15, "Asks for a password, code or card details"],
   ["urgency", 10, "Pressure: a deadline or threat"],
+  ["new_number_family", 25, "Claims to be someone you know on a new number"],
+  ["pay_third_party", 15, "Asks you to pay someone else's account"],
   ["page_asks_card", 15, "The linked page asks for card or login details"],
   ["planted_instructions", 25, "The linked page contains hidden instructions aimed at AI checkers"],
-  ["official_scam_warning", 10, "The company warns about messages like this"],
   ["sender_matches_official", -25, "Every link goes to the company's real website"],
 ] as const;
 
